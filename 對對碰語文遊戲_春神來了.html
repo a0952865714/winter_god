@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>春神跳舞的森林 - 櫻花精靈配對遊戲</title>
+    <style>
+        :root {
+            --pink-light: #fff0f6;
+            --pink-main: #ff85c0;
+            --pink-dark: #eb2f96;
+            --sakura-white: #ffffff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, var(--pink-light) 0%, #ffd6e7 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        /* 頂部資訊欄 */
+        .header {
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            font-weight: bold;
+            color: var(--pink-dark);
+            font-size: 1.2rem;
+        }
+
+        /* 進度條 */
+        .progress-container {
+            width: 90%;
+            max-width: 500px;
+            height: 15px;
+            background: #eee;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--pink-main);
+            transition: width 0.3s ease;
+        }
+
+        /* 遊戲區域 */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            width: 95%;
+            max-width: 600px;
+            padding: 10px;
+            perspective: 1000px;
+        }
+
+        /* 卡片設計 */
+        .card {
+            aspect-ratio: 3/4;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card.matched {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+
+        .card.shaking {
+            animation: shake 0.5s;
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 15px;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+            border: 4px solid white;
+            user-select: none;
+        }
+
+        /* 卡片正面：圖像 */
+        .card-front {
+            background: linear-gradient(135deg, #fff 0%, #ffd6e7 100%);
+            transform: rotateY(180deg);
+        }
+
+        .card-front span {
+            font-size: 3rem;
+            margin-bottom: 5px;
+        }
+
+        /* 卡片背面：生字 */
+        .card-back {
+            background: var(--pink-main);
+            color: white;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        /* 抖動動畫 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px); }
+            40%, 80% { transform: translateX(10px); }
+        }
+
+        /* 結算畫面 */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 133, 192, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #overlay h1 { font-size: 3rem; margin-bottom: 10px; }
+        #overlay p { font-size: 1.5rem; }
+
+        button {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            border: none;
+            border-radius: 30px;
+            background: white;
+            color: var(--pink-dark);
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+
+        button:active { transform: scale(0.95); }
+
+        /* 響應式調整 */
+        @media (max-width: 400px) {
+            .card-back { font-size: 1.2rem; }
+            .card-front span { font-size: 2.2rem; }
+            .game-grid { gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="stat-box">得分：<span id="score">0</span></div>
+        <div class="stat-box">時間：<span id="timer">60</span>s</div>
+    </div>
+
+    <div class="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div class="game-grid" id="game-grid">
+        <!-- 卡片會由 JS 生成 -->
+    </div>
+
+    <button onclick="resetGame()" style="background: var(--pink-dark); color: white; margin-top: 30px;">重新開始</button>
+
+    <div id="overlay">
+        <h1 id="win-title">春神醒了！</h1>
+        <p id="win-msg">你是森林守護者！</p>
+        <p id="final-score">總分：0</p>
+        <button onclick="resetGame()">再玩一次</button>
+    </div>
+
+    <script>
+        const cardData = [
+            { text: 'ing-hue', icon: '櫻花🌸' },
+            { text: '春神', icon: '🧚' },
+            { text: '小火車', icon: '🚂' },
+            { text: '鄒族', icon: '🏹' },
+            { text: '森林', icon: '🌲' },
+            { text: '精靈', icon: '✨' }
+        ];
+
+        let score = 0;
+        let timeLeft = 60;
+        let timerId = null;
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let isLock = false;
+
+        // 音效函數
+        function playSound(type) {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            if (type === 'match') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.2);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.3);
+            } else if (type === 'win') {
+                const frequencies = [523.25, 659.25, 783.99, 1046.50];
+                frequencies.forEach((f, i) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.frequency.setValueAtTime(f, ctx.currentTime + i * 0.1);
+                    g.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.5);
+                    o.start(ctx.currentTime + i * 0.1);
+                    o.stop(ctx.currentTime + i * 0.1 + 0.5);
+                });
+            }
+        }
+
+        function createGame() {
+            const grid = document.getElementById('game-grid');
+            grid.innerHTML = '';
+            
+            // 隨取4對
+            const selected = cardData.sort(() => 0.5 - Math.random()).slice(0, 4);
+            let deck = [];
+            selected.forEach(item => {
+                deck.push({ type: 'text', val: item.text, id: item.text });
+                deck.push({ type: 'icon', val: item.icon, id: item.text });
+            });
+            
+            deck.sort(() => 0.5 - Math.random());
+
+            deck.forEach(data => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.dataset.id = data.id;
+
+                card.innerHTML = `
+                    <div class="card-face card-back">?</div>
+                    <div class="card-face card-front">
+                        ${data.type === 'icon' ? `<span>${data.val}</span>` : `<b>${data.val}</b>`}
+                    </div>
+                `;
+
+                card.addEventListener('click', () => flipCard(card));
+                grid.appendChild(card);
+            });
+
+            startTimer();
+        }
+
+        function flipCard(card) {
+            if (isLock || card.classList.contains('flipped') || flippedCards.includes(card)) return;
+
+            card.classList.add('flipped');
+            flippedCards.push(card);
+
+            if (flippedCards.length === 2) {
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            isLock = true;
+            const [c1, c2] = flippedCards;
+            const isMatch = c1.dataset.id === c2.dataset.id;
+
+            if (isMatch) {
+                setTimeout(() => {
+                    c1.classList.add('matched');
+                    c2.classList.add('matched');
+                    score += 5;
+                    matchedPairs++;
+                    updateUI();
+                    playSound('match');
+                    flippedCards = [];
+                    isLock = false;
+                    checkWin();
+                }, 600);
+            } else {
+                setTimeout(() => {
+                    c1.classList.add('shaking');
+                    c2.classList.add('shaking');
+                    playSound('error');
+                    setTimeout(() => {
+                        c1.classList.remove('flipped', 'shaking');
+                        c2.classList.remove('flipped', 'shaking');
+                        flippedCards = [];
+                        isLock = false;
+                    }, 500);
+                }, 600);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score').innerText = score;
+            const progress = (matchedPairs / 4) * 100;
+            document.getElementById('progress-bar').style.width = progress + '%';
+        }
+
+        function startTimer() {
+            clearInterval(timerId);
+            timeLeft = 60;
+            document.getElementById('timer').innerText = timeLeft;
+            timerId = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerId);
+                    showEnd(false);
+                }
+            }, 1000);
+        }
+
+        function checkWin() {
+            if (matchedPairs === 4) {
+                clearInterval(timerId);
+                // 獎勵分數
+                if (timeLeft > 30) score += 20;
+                showEnd(true);
+            }
+        }
+
+        function showEnd(isWin) {
+            const overlay = document.getElementById('overlay');
+            const title = document.getElementById('win-title');
+            const msg = document.getElementById('win-msg');
+            const finalScore = document.getElementById('final-score');
+
+            overlay.style.display = 'flex';
+            finalScore.innerText = `總分：${score}`;
+
+            if (isWin) {
+                title.innerText = "春神醒了！";
+                msg.innerText = "你是森林守護者！";
+                playSound('win');
+            } else {
+                title.innerText = "時間到了！";
+                msg.innerText = "再試一次，叫醒春神吧！";
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            matchedPairs = 0;
+            flippedCards = [];
+            isLock = false;
+            document.getElementById('overlay').style.display = 'none';
+            updateUI();
+            createGame();
+        }
+
+        // 初始化
+        window.onload = createGame;
+    </script>
+</body>
+</html>
